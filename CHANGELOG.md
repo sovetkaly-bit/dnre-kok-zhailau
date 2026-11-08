@@ -11,3 +11,6 @@
 
 ## v1.3.1 (2026-11-08)
 - Добавлен раздел для монографии `docs/Monografiya_razdel_prostranstvennoe_nesootvetstvie.docx` и автозапуск тестов (GitHub Actions).
+
+## v1.3.2 (2026-11-08)
+- README: ссылка на онлайн-панель (Streamlit Community Cloud), убрана устаревшая пометка «приватный проект».
