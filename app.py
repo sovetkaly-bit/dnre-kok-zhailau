@@ -235,15 +235,16 @@ with tab7:
     doms = a5.default_domains(mets, limits)
     rows7 = [a5.assess(d, rd, base) for d in doms]
     s7 = a5.summary(rows7)
-    k1, k2, k3, k4 = st.columns(4)
+    k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("Доменов", s7["domains"])
     k2.metric("Зависят от границы", s7["depend_on_boundary"])
     k3.metric("Чувствительны", s7["sensitive"])
     k4.metric("R_flip = NA (TG)", s7["na_tg"])
+    k5.metric("N/A (не зависят от границы)", s7["na_independent"])
     df7 = a5.to_dataframe(rows7, rd)
     st.dataframe(df7, hide_index=True, width="stretch")
     if s7["package_depend"] == 0:
-        st.info("Домены пакета (вода, CCC) не используют площадь границы, R_flip = 0 по построению, "
+        st.info("Домены пакета (вода, CCC) не используют площадь границы, R_flip = N/A (not boundary-dependent), "
                 "это не доказательство устойчивости. " + a5.NOT_BOUNDARY[0].capitalize() + ": "
                 + a5.NOT_BOUNDARY[1] + ".")
     for name, why in a5.NO_VERDICT:

@@ -51,8 +51,9 @@ def test_package_water_domain_constant_indeterminate(readings):
     for P in (25, 50, 75, 95):
         row = a5.assess(a5.water_domain(P), readings)
         assert row.verdicts == ("INDETERMINATE",) * 3
-        assert row.r_flip == 0 and not row.sensitive and not row.depends_on_boundary
-        assert "по построению" in row.reason
+        assert row.r_flip == 0 and not row.sensitive and not row.depends_on_boundary   # внутренний ноль
+        assert row.boundary_independent and not row.na_tg
+        assert "not boundary-dependent" in row.reason
 
 
 def test_package_ccc_independent_of_boundary(readings):
@@ -63,6 +64,7 @@ def test_package_ccc_independent_of_boundary(readings):
         expect = "PASS" if r["margin"] > 0 else "FAIL"
         assert rows[r["density_limit"]].verdicts == (expect,) * 3
     assert not any(r.depends_on_boundary or r.sensitive for r in rows.values())
+    assert all(r.boundary_independent for r in rows.values())
 
 
 # ---------------- A5a: метрики
@@ -145,10 +147,17 @@ def test_run_default():
     s = a5.summary(rows)
     assert len(mrows) == 2 and s["domains"] == 10
     assert s["sensitive"] == 0 and s["na_tg"] == 2 and s["depend_on_boundary"] == 2
+    assert s["na_independent"] == 8
     # домены пакета (вода, CCC) границу не используют
     assert s["package_domains"] == 8 and s["package_depend"] == 0
     df = a5.to_dataframe(rows, readings)
     assert {"R_flip", "Чувствителен", "Зависит от границы", "Причина"} <= set(df.columns)
+    # снаружи: вода и CCC = N/A (not boundary-dependent), R1/I1 = NA (TG), числового 0 нет
+    vals = dict(zip(df["Домен"], df["R_flip"]))
+    na_ind = [v for k, v in vals.items() if k.startswith(("Зимний", "Рекреационная"))]
+    assert len(na_ind) == 8 and set(na_ind) == {"N/A (not boundary-dependent)"}
+    assert set(v for k, v in vals.items() if k.startswith(("R1", "I1"))) == {"NA (TG)"}
+    assert 0 not in list(df["R_flip"])
 
 
 def test_run_with_limits_finds_sensitive():
@@ -173,3 +182,10 @@ def test_streamlit_app_runs_and_has_a5_tab():
     assert not at.exception, [e.value for e in at.exception]
     assert len(at.tabs) == 7
     assert any("A5" in t.label for t in at.tabs)
+
+
+def test_a5a_numbers_unchanged(readings):
+    r1 = a5.assess_metric(a5.metric_r1(), readings)
+    i1 = a5.assess_metric(a5.metric_i1(), readings)
+    assert [round(v, 2) for v in r1.values] == [14.97, 7.16, 7.14]
+    assert [round(v, 2) for v in i1.values] == [29.94, 14.32, 14.28]

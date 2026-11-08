@@ -12,7 +12,8 @@ A5b  Verdict Robustness (Flip Rate). Только там, где есть обо
      при базовом 1002 га = 2/3). «Чувствителен» = вердикты на прочтениях не совпадают между собой.
      Если площадь меняет значение метрики, а порога нет, то R_flip = NA (TG), а не 0.
      Если домен вообще не использует площадь границы (вода, CCC, снегопроизводство, лавины, деревья),
-     он не привязывается к ней искусственно: R_flip = 0 по построению, а не по устойчивости.
+     он не привязывается к ней искусственно: наружу выводится N/A (not boundary-dependent), а не 0;
+     числовой 0 остаётся только внутри расчёта и не означает доказанную устойчивость.
 
 Это Verdict Robustness, а не VoI: вероятностей у прочтений нет. Вердикт даёт правило пакета
 (dnre_core.margin / dnre_core.decision). Пороговые домены не придумываются: порог вводит
@@ -232,6 +233,7 @@ class Row:
     depends_on_boundary: bool
     na_tg: bool
     reason: str
+    boundary_independent: bool = False   # граница не входит в формулу домена -> наружу N/A
 
 
 def r_flip(verdicts, baseline: int = 0) -> float:
@@ -262,10 +264,11 @@ def assess(domain: Domain, readings: list, baseline: int = 0) -> Row:
         reason = f"ЧУВСТВИТЕЛЕН: вердикт меняется между прочтениями ({path}). Нужна официальная граница."
     elif not depends:
         if set(verdicts) == {"INDETERMINATE"} and domain.nd_note:
-            reason = (f"Не использует площадь границы; INDETERMINATE на всех прочтениях: {domain.nd_note}. "
-                      "R_flip = 0 по построению, а не по устойчивости.")
+            reason = (f"Общая граница не является входом домена; INDETERMINATE на всех прочтениях: {domain.nd_note}. "
+                      "R_flip = N/A (not boundary-dependent); это не доказательство устойчивости.")
         else:
-            reason = "Не использует площадь границы; R_flip = 0 по построению, а не по устойчивости."
+            reason = ("Общая граница не является входом домена; R_flip = N/A (not boundary-dependent); "
+                      "это не доказательство устойчивости.")
     elif set(verdicts) == {"INDETERMINATE"}:
         reason = "Зависит от площади, но на всех прочтениях INDETERMINATE (интервал запаса пересекает 0)."
     else:
@@ -273,7 +276,7 @@ def assess(domain: Domain, readings: list, baseline: int = 0) -> Row:
         his = [x.hi for x in res if x.hi is not None]
         reason = (f"Зависит от площади, вердикт {verdicts[0]} на всех прочтениях "
                   f"(запас m от {min(los):.3f} до {max(his):.3f}); граница на этот домен не влияет.")
-    return Row(domain.name, domain.source, verdicts, rf, sensitive, depends, False, reason)
+    return Row(domain.name, domain.source, verdicts, rf, sensitive, depends, False, reason, not depends)
 
 
 def run_a5(domains: Optional[list] = None, readings: Optional[list] = None,
@@ -292,8 +295,13 @@ def to_dataframe(rows: list, readings: list) -> pd.DataFrame:
         rec = {"Домен": r.domain, "Источник": r.source}
         for rd, v in zip(readings, r.verdicts):
             rec[f"Вердикт при {rd.label}"] = v
-        rec["R_flip"] = "NA (TG)" if r.r_flip is None else round(r.r_flip, 3)
-        rec["Чувствителен"] = "NA (TG)" if r.sensitive is None else ("да" if r.sensitive else "нет")
+        if r.na_tg:
+            rec["R_flip"], rec["Чувствителен"] = "NA (TG)", "NA (TG)"
+        elif r.boundary_independent:
+            rec["R_flip"] = rec["Чувствителен"] = "N/A (not boundary-dependent)"
+        else:
+            rec["R_flip"] = round(r.r_flip, 3)
+            rec["Чувствителен"] = "да" if r.sensitive else "нет"
         rec["Зависит от границы"] = "да" if r.depends_on_boundary else "нет"
         rec["Причина"] = r.reason
         recs.append(rec)
@@ -305,5 +313,6 @@ def summary(rows: list) -> dict:
                 depend_on_boundary=sum(r.depends_on_boundary for r in rows),
                 sensitive=sum(bool(r.sensitive) for r in rows),
                 na_tg=sum(r.na_tg for r in rows),
+                na_independent=sum(r.boundary_independent for r in rows),
                 package_domains=sum(r.source == "пакет" for r in rows),
                 package_depend=sum(r.source == "пакет" and r.depends_on_boundary for r in rows))
