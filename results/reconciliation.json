@@ -1,0 +1,56 @@
+{
+  "source": {
+    "parcels": "Неофициальная геометрия через OSMANOV.KZ; требует официального подтверждения",
+    "file": "parcels_unofficial_osmanov.geojson",
+    "retrieved": "2026-11-08",
+    "egkn_boundary_status": "ND"
+  },
+  "methods": {
+    "geodesic": "геодезически: pyproj.Geod, эллипсоид WGS84, вход EPSG:4326",
+    "planar": "плоско: Shapely, UTM 43N (EPSG:32643)"
+  },
+  "declared_sum_ha": 1002.0,
+  "parcels_geodesic_sum_ha": 1001.625664,
+  "geodesic_diff_ha": -0.374336,
+  "geodesic_diff_pct": -0.037359,
+  "parcels_union_utm_ha": 1001.489925,
+  "parcels_mutual_overlap_ha": 0.0,
+  "all_parcels_valid": true,
+  "points_1_88": {
+    "label": "Контур по опубликованным координатам (точки 1–88); назначение и порядок соединения требуют уточнения",
+    "points_total": 88,
+    "points_inside": 3,
+    "area_ha": 2094.5466,
+    "inside_ha": 1001.1194,
+    "outside_ha": 1093.4272,
+    "share_inside_pct": 47.7965
+  },
+  "points_89_96": {
+    "label": "Отдельная группа опубликованных точек (89–96); назначение не подтверждено",
+    "points_total": 8,
+    "points_inside": 0,
+    "area_ha": 12.8192,
+    "inside_ha": 1.137,
+    "outside_ha": 11.6823,
+    "share_inside_pct": 8.8691
+  },
+  "contours": {
+    "все 96 точек": {
+      "valid": false,
+      "geodesic_ha": 2134.8697,
+      "utm_ha": 2134.5867
+    },
+    "контур 1–88": {
+      "valid": true,
+      "geodesic_ha": 2094.8211,
+      "utm_ha": 2094.5466
+    },
+    "контур 89–96": {
+      "valid": true,
+      "geodesic_ha": 12.8214,
+      "utm_ha": 12.8192
+    }
+  },
+  "overlap_89_96_with_1_88_utm_ha": 5.8825,
+  "union_89_96_and_1_88_utm_ha": 2101.4833
+}
