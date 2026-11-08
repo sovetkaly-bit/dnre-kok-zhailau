@@ -13,9 +13,9 @@ st.title("DNRE · Кок-Жайлау")
 st.caption("Динамическое природно-рекреационное равновесие — сценарная панель. "
            "Результат PASS/FAIL/INDETERMINATE зависит от допущений, а не от измерений.")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
     ["Зимний водный приоритет", "Помесячный баланс", "Рекреационная нагрузка (CCC)",
-     "Запас и решение", "Контур на карте", "Кадастр ↔ точки", "DNRE 2.0 / A5 Robustness"])
+     "Запас и решение", "Контур на карте", "Кадастр ↔ точки", "DNRE 2.0 / A5 Robustness", "DNRE 2.0 / A2 Winter minimum"])
 
 # ---------- 1. зимний приоритет ----------
 with tab1:
@@ -255,3 +255,28 @@ with tab7:
                        "a5b_verdict_robustness.csv", "text/csv")
     st.download_button("Скачать A5a (CSV)", a5.metrics_dataframe(mrows, rd).to_csv(index=False).encode("utf-8-sig"),
                        "a5a_metric_robustness.csv", "text/csv")
+
+# ---------- 8. DNRE 2.0 / A2: зимний минимум M(t) по межени ----------
+with tab8:
+    import io
+    import a2_winter_minimum as a2
+    st.write("Зимний минимум M(t) = (Q_nat − W_div − Q_min) / (Q_nat − Q_min) по месяцам, вердикт блока по XI–III. "
+             "Пустая ячейка = ND(DATA), а не 0. Оценочные значения не подставляются. "
+             "Единицы: м³ за месяц; интервал задаётся колонками *_lo и *_hi.")
+    st.download_button("Скачать пустой шаблон (CSV)",
+                       a2.template_dataframe().to_csv(index=False).encode("utf-8-sig"),
+                       "a2_winter_minimum_template.csv", "text/csv")
+    up2 = st.file_uploader("Заполненный шаблон (CSV)", type=["csv"], key="a2_csv")
+    try:
+        if up2 is not None:
+            df2 = pd.read_csv(io.BytesIO(up2.getvalue()), dtype=str, keep_default_na=False)
+        else:
+            df2 = a2.template_dataframe()
+            st.info("Файл не загружен: данных по Q_nat, W_div, Q_min нет, статус ND(DATA) / INDETERMINATE. "
+                    "Запросы к KTD, Казгидромету и Казгидрогеологии отправлены, ответы ожидаются.")
+        res2, verdict2, why2 = a2.assess(df2)
+        st.metric("Вердикт блока A2 (XI–III)", verdict2)
+        st.caption(why2)
+        st.dataframe(a2.to_dataframe(res2), hide_index=True, width="stretch")
+    except ValueError as e:
+        st.error(f"Ошибка во входных данных: {e}")
