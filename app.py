@@ -13,9 +13,9 @@ st.title("DNRE · Кок-Жайлау")
 st.caption("Динамическое природно-рекреационное равновесие — сценарная панель. "
            "Результат PASS/FAIL/INDETERMINATE зависит от допущений, а не от измерений.")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     ["Зимний водный приоритет", "Помесячный баланс", "Рекреационная нагрузка (CCC)",
-     "Запас и решение", "Контур на карте", "Кадастр ↔ точки"])
+     "Запас и решение", "Контур на карте", "Кадастр ↔ точки", "DNRE 2.0 / A5 Robustness"])
 
 # ---------- 1. зимний приоритет ----------
 with tab1:
@@ -201,3 +201,56 @@ with tab6:
             st.error(f"Не удалось прочитать файл: {e}")
     else:
         st.info("Файл не загружен: сверка не выполняется, статус SPATIAL / INDETERMINATE сохраняется.")
+
+# ---------- 7. DNRE 2.0 / A5: устойчивость к прочтениям границы (A5a метрики, A5b вердикты) ----------
+with tab7:
+    import a5_robustness as a5
+    rd = a5.boundary_readings()
+    st.subheader("A5a. Metric Robustness")
+    st.write("Значение метрики при трёх допустимых прочтениях площади границы. Порогов и вердиктов здесь нет.")
+    c1, c2 = st.columns(2)
+    with c1:
+        l_day = st.number_input("L_сут, чел./сут (R1)", 1.0, 1_000_000.0, float(a5.DEFAULT_L_DAY), 500.0)
+    with c2:
+        a_dist = st.number_input("A_наруш, га (I1; публичная оценка ≈300, не измерение)",
+                                 0.1, 5000.0, float(a5.DEFAULT_A_DISTURBED), 10.0)
+    mets = a5.default_metrics(l_day, None, a_dist, None)
+    mrows = [a5.assess_metric(m, rd) for m in mets]
+    st.dataframe(a5.metrics_dataframe(mrows, rd), hide_index=True, width="stretch")
+    st.caption("Все 96 точек подряд (2134,59 га) — невалидный полигон, в набор не входит. "
+               "Сумма контуров 2107,37 га неверна: пересечение 5,88 га считается дважды.")
+
+    st.subheader("A5b. Verdict Robustness")
+    st.write("Вердикт и R_flip считаются только там, где есть обоснованный порог. "
+             "Нет порога, но площадь меняет значение: R_flip = NA (TG), а не 0. "
+             "Это не VoI: у прочтений нет вероятностей.")
+    limits = {}
+    for m in mets:
+        on = st.checkbox(f"Ввести порог для {m.code} (из документа; по умолчанию порога нет)", False, key=f"lim_on_{m.code}")
+        if on:
+            limits[m.code] = st.number_input(f"Порог {m.code}, не больше, {m.unit}", 0.01, 1_000_000.0,
+                                             10.0, 0.5, key=f"lim_{m.code}")
+    base = st.selectbox("Базовое прочтение θ0", range(len(rd)),
+                        format_func=lambda i: f"{rd[i].label} — {rd[i].source}")
+    doms = a5.default_domains(mets, limits)
+    rows7 = [a5.assess(d, rd, base) for d in doms]
+    s7 = a5.summary(rows7)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Доменов", s7["domains"])
+    k2.metric("Зависят от границы", s7["depend_on_boundary"])
+    k3.metric("Чувствительны", s7["sensitive"])
+    k4.metric("R_flip = NA (TG)", s7["na_tg"])
+    df7 = a5.to_dataframe(rows7, rd)
+    st.dataframe(df7, hide_index=True, width="stretch")
+    if s7["package_depend"] == 0:
+        st.info("Домены пакета (вода, CCC) не используют площадь границы, R_flip = 0 по построению, "
+                "это не доказательство устойчивости. " + a5.NOT_BOUNDARY[0].capitalize() + ": "
+                + a5.NOT_BOUNDARY[1] + ".")
+    for name, why in a5.NO_VERDICT:
+        st.caption(f"Без вердикта в пакете: {name} — {why}.")
+    st.caption("Отложено до официальных полигонов: S2 (сохранённый свободный доступ, A_своб,P1 / A_своб,M0) "
+               "и пространственные индикаторы A3.")
+    st.download_button("Скачать A5b (CSV)", df7.to_csv(index=False).encode("utf-8-sig"),
+                       "a5b_verdict_robustness.csv", "text/csv")
+    st.download_button("Скачать A5a (CSV)", a5.metrics_dataframe(mrows, rd).to_csv(index=False).encode("utf-8-sig"),
+                       "a5a_metric_robustness.csv", "text/csv")
