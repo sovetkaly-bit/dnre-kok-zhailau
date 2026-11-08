@@ -16,7 +16,11 @@ PASS, если все пять PASS; иначе INDETERMINATE.
 * Пустая ячейка = ND(DATA), а не 0. Нулевой забор вводится явно (0). Оценочные значения Q_nat, W_div, Q_min
   модуль не подставляет и не берёт из пакета (в пакете нет месячных рядов межени).
 * Каждая величина может быть интервалом (колонки *_lo / *_hi); запас берётся по всем крайним комбинациям.
-* Если Q_nat ≤ Q_min, нормировка не определена (естественный сток уже не выше нормы): INDETERMINATE, причина указана.
+* Если Q_nat ≤ Q_min при любых значениях интервалов и W_div > 0: FAIL (baseline deficit): ΔQ < 0, доступного запаса
+  для нового забора нет; нормированный M не нужен. Если интервалы Q_nat и Q_min перекрываются (на части комбинаций
+  Q_nat > Q_min) или забор может быть нулевым: INDETERMINATE (причина NORM).
+* W_div — объём, забираемый из реки в данном месяце (не потребление курорта); Q_min — наиболее жёсткое применимое
+  требование (экологический минимум, условие разрешения, требование нижележащих пользователей).
 * Единицы: м³ за месяц. Перевод м³/с → м³/мес: m3s_to_month().
 """
 import calendar
@@ -116,11 +120,18 @@ def assess_month(row) -> MonthResult:
     missing = [q for q in QUANT if rng[q] is None]
     if missing:
         return MonthResult(m, "INDETERMINATE", None, None, "DATA", "ND(DATA): нет " + ", ".join(missing))
+    (qn_lo, qn_hi), (wd_lo, wd_hi), (qm_lo, qm_hi) = (rng[q] for q in QUANT)
+    if qn_hi <= qm_lo:                       # Q_nat ≤ Q_min на всех комбинациях
+        if wd_lo > 0:
+            return MonthResult(m, "FAIL", None, None, None,
+                               "baseline deficit: Q_nat ≤ Q_min при W_div > 0, ΔQ < 0, запаса для забора нет")
+        return MonthResult(m, "INDETERMINATE", None, None, "NORM",
+                           "Q_nat ≤ Q_min, забор может быть нулевым: вклад проекта не определён")
     try:
         lo, hi = month_margin(*(rng[q] for q in QUANT))
     except ValueError:
         return MonthResult(m, "INDETERMINATE", None, None, "NORM",
-                           "Q_nat ≤ Q_min: нормировка не определена, естественный сток не выше нормы")
+                           "интервалы Q_nat и Q_min перекрываются: нормировка не определена")
     return MonthResult(m, c.decision(lo, hi, True), lo, hi, None, "")
 
 

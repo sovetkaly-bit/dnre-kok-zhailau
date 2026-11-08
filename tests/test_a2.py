@@ -76,9 +76,20 @@ def test_interval_corners_monotone():
     assert hi == pytest.approx(c.margin(110, 30, 100, "lower"))
 
 
-def test_natural_flow_not_above_norm():
-    res, verdict, _ = a2.assess(synth(q_nat=40, q_min=40))
+def test_baseline_deficit_with_diversion_is_fail():
+    res, verdict, _ = a2.assess(synth(q_nat=40, w_div=5, q_min=40))
+    assert all(r.verdict == "FAIL" for r in res if r.month in c.WINTER) and verdict == "FAIL"
+
+
+def test_natural_flow_not_above_norm_without_diversion():
+    res, verdict, _ = a2.assess(synth(q_nat=40, w_div=0, q_min=40))
     assert all(r.cause == "NORM" for r in res) and verdict == "INDETERMINATE"
+
+
+def test_overlapping_intervals_indeterminate():
+    over = {m: dict(Q_nat_lo=30, Q_nat_hi=60) for m in range(1, 13)}
+    res, verdict, _ = a2.assess(synth(q_nat=45, w_div=5, q_min=40, over=over))
+    assert all(r.verdict == "INDETERMINATE" for r in res if r.month in c.WINTER)
 
 
 def test_invalid_inputs():
