@@ -1,0 +1,35 @@
+name: terisbutak-eco-flow
+on:
+  workflow_dispatch:
+  push:
+    branches: [terisbutak-eco-flow]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt pytest openpyxl matplotlib
+      - run: python -m pytest -q
+  eco-check:
+    runs-on: ubuntu-latest
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python scripts/terisbutak_eco.py OUTPUTS
+      - run: cp docs/terisbutak_eco_paragraph.md OUTPUTS/
+      - name: summary
+        if: always()
+        run: cat OUTPUTS/Check_Report_Eco.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terisbutak-eco-outputs
+          path: OUTPUTS
