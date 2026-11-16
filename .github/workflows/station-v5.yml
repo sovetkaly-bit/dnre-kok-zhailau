@@ -54,8 +54,20 @@ jobs:
           INPUT_REPO: ${{ vars.DNRE_INPUT_REPO }}
         run: |
           mkdir -p work
+          [ -n "$INPUT_TOKEN" ] || { echo "::error::секрет DNRE_INPUT_TOKEN пуст или не создан"; exit 1; }
+          [ -n "$INPUT_REPO" ] || { echo "::error::переменная DNRE_INPUT_REPO пуста или не создана"; exit 1; }
+          code=$(curl -sS -o work/list.json -w '%{http_code}' -H "Authorization: Bearer $INPUT_TOKEN" \
+            -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$INPUT_REPO/contents/")
+          if [ "$code" != "200" ]; then
+            echo "::error::список файлов в $INPUT_REPO: HTTP $code (401 токен неверен или истёк; 403 нет прав Contents:read; 404 репозиторий не найден или токен выдан на другой репозиторий)"
+            exit 1
+          fi
+          names=$(python3 -c "import json;print(' | '.join(x['name'] for x in json.load(open('work/list.json'))))")
+          zipname=$(python3 -c "import json;z=[x['name'] for x in json.load(open('work/list.json')) if x['name'].lower().endswith('.zip')];print(z[0] if len(z)==1 else '')")
+          [ -n "$zipname" ] || { echo "::error::в корне $INPUT_REPO нет ровно одного .zip; файлы: $names"; exit 1; }
+          echo "Найден файл: $zipname"
           curl -fsSL -H "Authorization: Bearer $INPUT_TOKEN" -H "Accept: application/vnd.github.raw+json" \
-            "https://api.github.com/repos/$INPUT_REPO/contents/DNRE_Station_v5_Actions_Input.zip" -o work/bundle.zip
+            "https://api.github.com/repos/$INPUT_REPO/contents/$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$zipname")" -o work/bundle.zip
           cd work && unzip -q bundle.zip
           test -f Input_SHA256.txt && test -f v5/analysis_v5.py && test -d INPUTS
           (cd INPUTS && sha256sum -c ../Input_SHA256.txt)
