@@ -1,0 +1,55 @@
+name: terisbutak-winter
+on:
+  workflow_dispatch:
+  push:
+    branches: [terisbutak-14253-winter]
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt pytest openpyxl matplotlib
+      - run: python -m pytest -q
+  winter-flow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pandas numpy openpyxl matplotlib
+      - name: fetch private workbook
+        env:
+          INPUT_TOKEN: ${{ secrets.DNRE_INPUT_TOKEN }}
+          INPUT_REPO: ${{ vars.DNRE_INPUT_REPO }}
+          FILE: Terisbutak_14253_Daily_Flow_2020_2023.xlsx
+        run: |
+          mkdir -p work
+          [ -n "$INPUT_TOKEN" ] || { echo "::error::секрет DNRE_INPUT_TOKEN пуст или не создан"; exit 1; }
+          [ -n "$INPUT_REPO" ] || { echo "::error::переменная DNRE_INPUT_REPO пуста или не создана"; exit 1; }
+          code=$(curl -sS -o work/$FILE -w '%{http_code}' -H "Authorization: Bearer $INPUT_TOKEN" \
+            -H "Accept: application/vnd.github.raw+json" \
+            "https://api.github.com/repos/$INPUT_REPO/contents/$FILE")
+          if [ "$code" != "200" ]; then
+            echo "::error::файл $FILE в $INPUT_REPO: HTTP $code (404 файла нет в корне приватного репозитория или токен не видит репозиторий; 401 токен неверен или истёк)"
+            exit 1
+          fi
+          sha256sum work/$FILE
+      - name: calculate winter flow
+        run: python scripts/terisbutak_winter.py work/Terisbutak_14253_Daily_Flow_2020_2023.xlsx OUTPUTS
+      - name: summary
+        if: always()
+        run: |
+          if [ -f OUTPUTS/Check_Report.md ]; then
+            { echo "### Контрольная сверка"; cat OUTPUTS/Check_Report.md; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terisbutak-winter-outputs
+          path: OUTPUTS
