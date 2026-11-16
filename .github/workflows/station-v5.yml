@@ -1,0 +1,72 @@
+name: station-v5
+on:
+  workflow_dispatch:
+  push:
+    branches: [v5-station-actions]
+permissions:
+  contents: read
+jobs:
+  repo-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt pytest
+      - name: pytest
+        run: python -m pytest -q -rA --junitxml=pytest.xml | tee pytest.log
+      - name: reconciliation vs reference JSON
+        run: |
+          python scripts/run_reconciliation.py > reconciliation_new.json
+          python - <<'PY'
+          import json
+          a = json.load(open('reconciliation_new.json'))
+          b = json.load(open('results/reconciliation.json'))
+          assert a == b, 'reconciliation.json расходится с эталоном'
+          print('reconciliation: совпадает с results/reconciliation.json')
+          PY
+      - name: geometry test status
+        run: |
+          grep -E "PASSED|SKIPPED|FAILED" pytest.log | grep -E "cadastre|96_points|streamlit" | tee geometry_status.txt
+          { echo "### Геометрические тесты"; echo '```'; cat geometry_status.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: repo-checks
+          path: |
+            pytest.xml
+            pytest.log
+            reconciliation_new.json
+            geometry_status.txt
+  station-v5:
+    # Включается переменной репозитория DNRE_STATION_INPUT=enabled и секретом DNRE_PRIVATE_BUNDLE_URL.
+    if: ${{ vars.DNRE_STATION_INPUT == 'enabled' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pandas numpy scipy matplotlib
+      - name: fetch private bundle (v5 package + three CSV)
+        env:
+          BUNDLE_URL: ${{ secrets.DNRE_PRIVATE_BUNDLE_URL }}
+        run: |
+          mkdir -p work && curl -fsSL "$BUNDLE_URL" -o work/bundle.zip
+          cd work && unzip -q bundle.zip
+          test -f Input_SHA256.txt && test -f v5/analysis_v5.py && test -d INPUTS
+          (cd INPUTS && sha256sum -c ../Input_SHA256.txt)
+      - name: run analysis_v5
+        working-directory: work
+        run: |
+          OPENBLAS_NUM_THREADS=1 python v5/analysis_v5.py INPUTS OUTPUTS
+      - name: compare with v5 references
+        working-directory: work
+        run: python ../scripts/compare_v5.py v5 OUTPUTS compare_report.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: station-v5-outputs
+          path: |
+            work/OUTPUTS
+            work/compare_report.md
