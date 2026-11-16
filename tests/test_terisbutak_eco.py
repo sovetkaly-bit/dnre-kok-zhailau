@@ -46,3 +46,14 @@ def test_bases_are_not_merged():
 
 def test_mean_eco_reference_exceeds_winter_minimum_so_uniform_use_is_unsafe():
     assert e.W_ECO_ANNUAL / (365 * 86400) > e.Q_NOTE_30D
+
+
+def test_deductions_30d_table():
+    rows = e.deductions_30d()
+    assert [r["max_total_deductions_m3"] for r in rows] == [387588.0, 372828.0, 344088.0, 295998.0]
+    assert [r["demand_m3"] for r in rows] == [37500, 52260, 81000, 129090]
+    for r in rows:
+        assert r["gross_m3"] == pytest.approx(425088)
+        assert r["demand_m3"] + r["max_total_deductions_m3"] == pytest.approx(r["gross_m3"])
+        daily = e.max_deductions(0.164, r["demand_m3d"])[1] * 30
+        assert daily == pytest.approx(r["max_total_deductions_m3"])

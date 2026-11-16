@@ -98,6 +98,20 @@ def monthly_norms():
     return rows
 
 
+def deductions_30d(q_m3s=Q_NOTE_30D, days=30):
+    """Баланс за расчётный период при постоянном расходе: валовой сток − потребность = предельные вычеты."""
+    rows = []
+    gross30 = m3s_to_m3d(q_m3s) * days
+    for label, dem, src in DEMANDS:
+        need = dem * days
+        rows.append({"flow_basis": "0,164 м³/с (записка, створ не назван)", "demand_label": label, "demand_m3d": dem,
+                     "days": days, "gross_m3": round(gross30, 1), "demand_m3": need,
+                     "max_total_deductions_m3": round(max(0.0, gross30 - need), 1),
+                     "share_of_gross": round(max(0.0, gross30 - need) / gross30, 4),
+                     "comment": "суммарный баланс при постоянном расходе; суточные пределы и работа накопителей требуют календарного ряда притока и графика попуска"})
+    return rows
+
+
 def basis_comparison():
     mouth_95 = 7.57e6 / (365 * SEC_D)
     return [{
@@ -119,6 +133,7 @@ def main(out):
     write_csv(out / "Eco_Unit_Checks.csv", uc)
     write_csv(out / "Eco_Demand_Scenarios.csv", demand_scenarios())
     write_csv(out / "Eco_Winter_Norms_Monthly.csv", monthly_norms())
+    write_csv(out / "Eco_Deductions_30d.csv", deductions_30d())
     write_csv(out / "Eco_Basis_Comparison.csv", basis_comparison())
     bad = [c for c in uc if not c["ok"]]
     sc = [r for r in demand_scenarios() if r["flow_basis"].startswith("0,164")]
