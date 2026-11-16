@@ -39,7 +39,7 @@ jobs:
             reconciliation_new.json
             geometry_status.txt
   station-v5:
-    # Включается переменной репозитория DNRE_STATION_INPUT=enabled и секретом DNRE_PRIVATE_BUNDLE_URL.
+    # Включается переменными DNRE_STATION_INPUT=enabled, DNRE_INPUT_REPO (владелец/приватный репозиторий) и секретом DNRE_INPUT_TOKEN.
     if: ${{ vars.DNRE_STATION_INPUT == 'enabled' }}
     runs-on: ubuntu-latest
     steps:
@@ -50,9 +50,12 @@ jobs:
       - run: pip install pandas numpy scipy matplotlib
       - name: fetch private bundle (v5 package + three CSV)
         env:
-          BUNDLE_URL: ${{ secrets.DNRE_PRIVATE_BUNDLE_URL }}
+          INPUT_TOKEN: ${{ secrets.DNRE_INPUT_TOKEN }}
+          INPUT_REPO: ${{ vars.DNRE_INPUT_REPO }}
         run: |
-          mkdir -p work && curl -fsSL "$BUNDLE_URL" -o work/bundle.zip
+          mkdir -p work
+          curl -fsSL -H "Authorization: Bearer $INPUT_TOKEN" -H "Accept: application/vnd.github.raw+json" \
+            "https://api.github.com/repos/$INPUT_REPO/contents/DNRE_Station_v5_Actions_Input.zip" -o work/bundle.zip
           cd work && unzip -q bundle.zip
           test -f Input_SHA256.txt && test -f v5/analysis_v5.py && test -d INPUTS
           (cd INPUTS && sha256sum -c ../Input_SHA256.txt)
