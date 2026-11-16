@@ -103,3 +103,17 @@ def test_geojson_nulls_for_unlocated():
     g = mp.geojson(mp.load_registry())
     assert sum(1 for f in g["features"] if f["geometry"]) == 4
     assert json.dumps(g, ensure_ascii=False)
+
+
+def test_storage_capacity_sources_sum_and_disagree():
+    rows = w.read_csv("storage_capacity_sources.csv")
+    for r in rows:
+        assert float(r["lake_2_m3"]) + float(r["lake_5_m3"]) + float(r["lake_6_m3"]) == float(r["total_m3"])
+    assert [float(r["total_m3"]) for r in rows] == [183900.0, 234590.0]
+    assert 183900 - 118000 == 65900                      # остаток после цикла оснежения по ОПЗ
+    assert 23923.2 / 183900 < 0.131                      # максимум сценарного запаса относительно меньшей ёмкости
+
+
+def test_demand_register_confirms_rates_from_opz():
+    reg = {r["value"]: r for r in w.demand_register()}
+    assert reg["100 м³/ч"]["status"].startswith("подтверждено ОПЗ") and reg["80 м³/ч"]["status"].startswith("подтверждено ОПЗ")
