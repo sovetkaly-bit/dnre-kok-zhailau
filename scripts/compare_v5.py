@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 expected, output, report = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+TOL = 1e-9  # допуск на числовой шум библиотек (float64); целые и текст сравниваются точно
 lines, failed = [], False
 
 def log(msg):
@@ -38,7 +39,9 @@ for name in names:
             bad = a[col].astype(str) != b[col].astype(str)
             if bad.any():
                 worst = (np.inf, (int(bad.idxmax()), col))
-    if worst[0] == 0:
+    if worst[0] <= TOL:
+        log(f'- {name}: совпадает в пределах {TOL:g} (макс. разница {worst[0]:.3g}, строка {worst[1][0]}, колонка {worst[1][1]}); байты различаются')
+    elif worst[0] == 0:
         log(f'- {name}: совпадает по значениям, различается только запись байтов')
     else:
         row, col = worst[1]
